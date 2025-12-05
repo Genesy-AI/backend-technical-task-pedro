@@ -1,0 +1,1 @@
+export const INVALID_COUNTRY_CODE_SUFFIX = '[INVALID]'
