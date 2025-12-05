@@ -1,4 +1,4 @@
-import { INVALID_COUNTRY_CODE_SUFFIX } from 'src/constants'
+import { INVALID_COUNTRY_CODE_SUFFIX } from '../constants'
 
 export function validateCountryCode(code: string | undefined | null): string | null {
   if (!code || !code.trim()) return null
