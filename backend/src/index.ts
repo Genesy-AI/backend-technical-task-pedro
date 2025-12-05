@@ -4,6 +4,7 @@ import { Connection, Client } from '@temporalio/client'
 import { verifyEmailWorkflow } from './workflows'
 import { generateMessageFromTemplate } from './utils/messageGenerator'
 import { runTemporalWorker } from './worker'
+import { validateCountryCode } from './utils/validateCountryCode'
 const prisma = new PrismaClient()
 const app = express()
 app.use(express.json())
@@ -227,7 +228,7 @@ app.post('/leads/bulk', async (req: Request, res: Response) => {
             lastName: lead.lastName.trim(),
             email: lead.email.trim(),
             jobTitle: lead.jobTitle ? lead.jobTitle.trim() : null,
-            countryCode: lead.countryCode ? lead.countryCode.trim() : null,
+            countryCode: validateCountryCode(lead.countryCode),
             companyName: lead.companyName ? lead.companyName.trim() : null,
           },
         })
