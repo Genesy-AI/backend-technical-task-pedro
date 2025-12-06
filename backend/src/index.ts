@@ -1,10 +1,11 @@
 import { PrismaClient } from '@prisma/client'
 import express, { Request, Response } from 'express'
 import { Connection, Client } from '@temporalio/client'
-import { verifyEmailWorkflow } from './workflows'
+import { findPhoneWorkflow, verifyEmailWorkflow } from './workflows'
 import { generateMessageFromTemplate } from './utils/messageGenerator'
 import { runTemporalWorker } from './worker'
 import { validateCountryCode } from './utils/validateCountryCode'
+import { LeadFindPhoneReqBody } from './types/Leads'
 const prisma = new PrismaClient()
 const app = express()
 app.use(express.json())
@@ -313,6 +314,58 @@ app.post('/leads/verify-emails', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to verify emails' })
   }
 })
+
+app.post(
+  '/leads/find-phones',
+  async (
+    req: Request<
+      {},
+      {},
+      {
+        leads?: Array<LeadFindPhoneReqBody>
+      }
+    >,
+    res: Response
+  ) => {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ error: 'Request body is required and must be valid JSON' })
+    }
+
+    const { leads } = req.body
+
+    if (!Array.isArray(leads) || leads.length === 0) {
+      return res.status(400).json({ error: '"leads" must be a non-empty array' })
+    }
+
+    if (leads.some((lead) => !(lead.firstName && lead.lastName && lead.email))) {
+      return res.status(400).json({ error: 'Missing fields for at least one lead' })
+    }
+
+    const connection = await Connection.connect({ address: 'localhost:7233' })
+    const client = new Client({ connection, namespace: 'default' })
+
+    for (const lead of leads) {
+      if (!lead || typeof lead !== 'object' || !lead.firstName || !lead.lastName || !lead.email) {
+        console.warn('Skipping invalid lead details:', lead)
+        continue
+      }
+
+      await client.workflow.start(findPhoneWorkflow, {
+        args: [lead],
+        taskQueue: 'myQueue',
+        workflowId: `genesy-lead-${lead.id}-${Date.now()}`,
+      })
+    }
+
+    try {
+      res.status(200).json({ success: true })
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to find phones' })
+    } finally {
+      await connection.close()
+    }
+  }
+)
 
 app.listen(4000, () => {
   console.log('Express server is running on port 4000')
