@@ -108,11 +108,11 @@ Take into account provider rate limits, right now they have unlimited RPS/RPM, h
 >
 > Base URL: `https://api.genesy.ai/api/tmp/orionConnect`
 >
-> Request: `{ "fullName": "Ada Lovelace", "companyWebsite": "example.com" }`
+> Request: `POST { "fullName": "Ada Lovelace", "companyWebsite": "example.com" }`
 >
 > Authentication: `Request header 'x-auth-me' with key 'mySecretKey123'`
 >
-> Response: `POST { "phone": string | null }`
+> Response: `{ "phone": string | null }`
 
 **Astra Dialer**
 > Provider with the worst data in the market, but is the fastest one
