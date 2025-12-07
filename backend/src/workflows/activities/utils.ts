@@ -16,7 +16,8 @@ export async function findPhoneActivity(lead: LeadFindPhoneReqBody) {
   if (!lead.email) {
     throw new Error('Lead email is required')
   }
-  const response = await fetch('https://jsonplaceholder.typicode.com/posts/1', {
+
+  const response = await fetch('https://api.genesy.ai/api/tmp/orionConnect', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-auth-me': 'mySecretKey123' },
     body: JSON.stringify({
@@ -25,7 +26,50 @@ export async function findPhoneActivity(lead: LeadFindPhoneReqBody) {
     }),
   })
 
-  console.log('Response: => ', response)
+  const res = await response.json()
 
-  return response.ok ? '123-456-7890' : null
+  console.log('findPhoneActivity response:', res)
+
+  return response ? res : null
+}
+
+export async function findPhone(lead: LeadFindPhoneReqBody) {
+  if (!lead.email) {
+    throw new Error('Lead email is required')
+  }
+
+  const response = await fetch('https://api.genesy.ai/api/tmp/astraDialer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apiKey: '1234jhgf' },
+    body: JSON.stringify({
+      email: lead.email,
+    }),
+  })
+
+  const res = await response.json()
+
+  console.log('findPhoneActivity response:', res)
+
+  return response ? res : null
+}
+
+export async function findPhone2(lead: LeadFindPhoneReqBody) {
+  if (!(lead.email && lead.jobTitle)) {
+    throw new Error('Lead email is required')
+  }
+
+  const response = await fetch('https://api.genesy.ai/api/tmp/numbusLookup?api=000099998888', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: lead.email,
+      jobTitle: lead.jobTitle,
+    }),
+  })
+
+  const res = await response.json()
+
+  console.log('findPhoneActivity response:', res)
+
+  return response ? res : null
 }

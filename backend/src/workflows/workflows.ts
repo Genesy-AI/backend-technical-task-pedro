@@ -6,7 +6,7 @@ const { verifyEmail } = proxyActivities<typeof activities>({
   startToCloseTimeout: '1 second',
 })
 
-const { findPhoneActivity } = proxyActivities<typeof activities>({
+const { findPhoneActivity, findPhone, findPhone2 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '15 seconds',
 })
 
@@ -15,5 +15,5 @@ export async function verifyEmailWorkflow(email: string): Promise<boolean> {
 }
 
 export async function findPhoneWorkflow(lead: LeadFindPhoneReqBody): Promise<string | null> {
-  return await findPhoneActivity(lead)
+  return await findPhone2(lead)
 }
