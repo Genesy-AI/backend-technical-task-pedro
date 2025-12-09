@@ -5,7 +5,7 @@ import { findPhoneWorkflow, verifyEmailWorkflow } from './workflows'
 import { generateMessageFromTemplate } from './utils/messageGenerator'
 import { runTemporalWorker } from './worker'
 import { validateCountryCode } from './utils/validateCountryCode'
-import { LeadFindPhoneReqBody } from './types/Leads'
+import { canUseAnyProvider } from './utils/validateProvidersEligibility'
 const prisma = new PrismaClient()
 const app = express()
 app.use(express.json())
@@ -296,7 +296,7 @@ app.post('/leads/verify-emails', async (req: Request, res: Response) => {
         })
 
         results.push({ leadId: lead.id, emailVerified: isVerified })
-        verifiedCount += 1
+        verifiedCount++
       } catch (error) {
         errors.push({
           leadId: lead.id,
@@ -322,7 +322,7 @@ app.post(
       {},
       {},
       {
-        leads?: Array<LeadFindPhoneReqBody>
+        leadIds: number[]
       }
     >,
     res: Response
@@ -331,42 +331,74 @@ app.post(
       return res.status(400).json({ error: 'Request body is required and must be valid JSON' })
     }
 
-    const { leads } = req.body
+    const { leadIds } = req.body
 
-    if (!Array.isArray(leads) || leads.length === 0) {
+    if (!Array.isArray(leadIds) || leadIds.length === 0) {
       return res.status(400).json({ error: '"leads" must be a non-empty array' })
     }
 
-    if (leads.some((lead) => !(lead.firstName && lead.lastName && lead.email))) {
-      return res.status(400).json({ error: 'Missing fields for at least one lead' })
-    }
+    try {
+      const leads = await prisma.lead.findMany({
+        where: { id: { in: leadIds.map((id) => Number(id)) } },
+      })
 
-    const connection = await Connection.connect({ address: 'localhost:7233' })
-    const client = new Client({ connection, namespace: 'default' })
-
-    for (const lead of leads) {
-      if (!lead || typeof lead !== 'object' || !lead.firstName || !lead.lastName || !lead.email) {
-        console.warn('Skipping invalid lead details:', lead)
-        continue
+      if (leads.length === 0) {
+        return res.status(404).json({ error: 'No "leads" found with the provided IDs' })
       }
 
-      await client.workflow.start(findPhoneWorkflow, {
-        args: [lead],
-        taskQueue: 'myQueue',
-        workflowId: `genesy-lead-${lead.id}-${Date.now()}`,
-        retry: {
-          maximumAttempts: 3,
-          maximumInterval: '30 seconds',
-        },
-      })
-    }
+      const eligibleLeads = leads.filter((lead) => canUseAnyProvider(lead))
 
-    try {
-      res.status(200).json({ success: true })
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to find phones' })
-    } finally {
+      if (eligibleLeads.length === 0) {
+        return res.status(400).json({
+          error:
+            'No valid "leads" found. A combination of the following is required - ["email"], ["email" and "jobTitle"], ["email", "firstName" and "lastName" ]',
+        })
+      }
+
+      const connection = await Connection.connect({ address: 'localhost:7233' })
+      const client = new Client({ connection, namespace: 'default' })
+
+      let phonesFoundCount = 0
+      const errors: Array<{ lead: number; error: string }> = []
+
+      for (const leadData of leads) {
+        try {
+          const leadWithPhoneProcessed = await client.workflow.execute(findPhoneWorkflow, {
+            args: [leadData],
+            taskQueue: 'myQueue',
+            workflowId: `genesy-lead-${leadData.id}-${Date.now()}`,
+            retry: {
+              maximumAttempts: 3,
+              maximumInterval: '30 seconds',
+            },
+          })
+
+          if (leadWithPhoneProcessed?.phone) {
+            await prisma.lead.update({
+              where: { id: Number(leadData.id) },
+              data: { phoneNumber: leadWithPhoneProcessed?.phone || null },
+            })
+
+            phonesFoundCount++
+          }
+        } catch (error) {
+          errors.push({
+            lead: leadData.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          })
+        }
+      }
+
       await connection.close()
+
+      res.status(200).json({
+        success: true,
+        phonesFoundCount,
+        phoneNotFoundCount: leadIds.length - phonesFoundCount,
+      })
+    } catch (error) {
+      console.error('Error finding phones for leads:', error)
+      res.status(500).json({ error: 'Failed to find phones' })
     }
   }
 )
