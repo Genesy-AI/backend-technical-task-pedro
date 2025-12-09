@@ -4,14 +4,14 @@ import { LeadFindPhoneReqBody } from 'src/types/Leads'
 
 const { findPhoneByNameAndCompanyWebsite, findPhoneByEmail, findPhoneByEmailAndJobTitle, verifyEmail } =
   proxyActivities<typeof activities>({
-    startToCloseTimeout: '1 second',
+    startToCloseTimeout: '5 second',
   })
 
 export async function verifyEmailWorkflow(email: string): Promise<boolean> {
   return await verifyEmail(email)
 }
 
-export async function findPhoneWorkflow(lead: LeadFindPhoneReqBody): Promise<string | null> {
+export async function findPhoneWorkflow(lead: LeadFindPhoneReqBody): Promise<{ phone: string } | null> {
   // Try Provider One
   const phoneSearch1 = await findPhoneByNameAndCompanyWebsite(lead)
   if (phoneSearch1 !== null) {
