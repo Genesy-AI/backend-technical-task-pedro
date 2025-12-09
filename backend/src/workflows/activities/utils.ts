@@ -13,8 +13,11 @@ export async function verifyEmail(email: string): Promise<boolean> {
 }
 
 export async function findPhoneByNameAndCompanyWebsite(lead: LeadFindPhoneReqBody) {
-  if (!lead.email) {
-    throw new Error('Lead email is required')
+  if (!(lead.email && lead.firstName && lead.lastName)) {
+    console.warn(
+      'Insufficient data for Orion Connect provider - first name, last name and company website are required'
+    )
+    return null
   }
 
   const response = await fetch('https://api.genesy.ai/api/tmp/orionConnect', {
@@ -26,16 +29,13 @@ export async function findPhoneByNameAndCompanyWebsite(lead: LeadFindPhoneReqBod
     }),
   })
 
-  const res = await response.json()
-
-  console.log('findPhoneActivity response:', res)
-
-  return response ? res : null
+  return response.json()
 }
 
 export async function findPhoneByEmail(lead: LeadFindPhoneReqBody) {
   if (!lead.email) {
-    throw new Error('Lead email is required')
+    console.warn('Insufficient data for Astra Dialer provider - email is required')
+    return null
   }
 
   const response = await fetch('https://api.genesy.ai/api/tmp/astraDialer', {
@@ -46,16 +46,13 @@ export async function findPhoneByEmail(lead: LeadFindPhoneReqBody) {
     }),
   })
 
-  const res = await response.json()
-
-  console.log('findPhoneActivity response:', res)
-
-  return response ? res : null
+  return response.json()
 }
 
 export async function findPhoneByEmailAndJobTitle(lead: LeadFindPhoneReqBody) {
   if (!(lead.email && lead.jobTitle)) {
-    throw new Error('Lead email is required')
+    console.warn('Insufficient data for Numbus Lookup provider - email and job title are required')
+    return null
   }
 
   const response = await fetch('https://api.genesy.ai/api/tmp/numbusLookup?api=000099998888', {
@@ -67,9 +64,5 @@ export async function findPhoneByEmailAndJobTitle(lead: LeadFindPhoneReqBody) {
     }),
   })
 
-  const res = await response.json()
-
-  console.log('findPhoneActivity response:', res)
-
-  return response ? res : null
+  return response.json()
 }
