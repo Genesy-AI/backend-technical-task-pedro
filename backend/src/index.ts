@@ -334,12 +334,21 @@ app.post(
     const { leadIds } = req.body
 
     if (!Array.isArray(leadIds) || leadIds.length === 0) {
-      return res.status(400).json({ error: '"leads" must be a non-empty array' })
+      return res.status(400).json({ error: '"leadIds" must be a non-empty array' })
     }
+
+    const numericIds = leadIds.map((id) => (typeof id === 'string' ? Number(id) : id))
+    const invalidIds = numericIds.filter((id) => !Number.isInteger(id) || id <= 0 || isNaN(id))
+
+    if (invalidIds.length > 0) {
+      return res.status(400).json({ error: 'All leadIds must be valid positive integers' })
+    }
+
+    let connection: Connection | undefined
 
     try {
       const leads = await prisma.lead.findMany({
-        where: { id: { in: leadIds.map((id) => Number(id)) } },
+        where: { id: { in: numericIds } },
       })
 
       if (leads.length === 0) {
@@ -355,7 +364,7 @@ app.post(
         })
       }
 
-      const connection = await Connection.connect({ address: 'localhost:7233' })
+      connection = await Connection.connect({ address: 'localhost:7233' })
       const client = new Client({ connection, namespace: 'default' })
 
       let phonesFoundCount = 0
@@ -366,7 +375,7 @@ app.post(
           const leadWithPhoneProcessed = await client.workflow.execute(findPhoneWorkflow, {
             args: [leadData],
             taskQueue: 'myQueue',
-            workflowId: `genesy-lead-${leadData.id}-${Date.now()}`,
+            workflowId: `find-phone-number-${leadData.id}-${Date.now()}`,
             retry: {
               maximumAttempts: 3,
               maximumInterval: '30 seconds',
@@ -395,10 +404,15 @@ app.post(
         success: true,
         phonesFoundCount,
         phoneNotFoundCount: leadIds.length - phonesFoundCount,
+        errors,
       })
     } catch (error) {
       console.error('Error finding phones for leads:', error)
       res.status(500).json({ error: 'Failed to find phones' })
+    } finally {
+      if (connection) {
+        await connection.close()
+      }
     }
   }
 )

@@ -15,7 +15,7 @@ export async function verifyEmail(email: string): Promise<boolean> {
 export async function findPhoneByNameAndCompanyWebsite(lead: LeadFindPhoneReqBody) {
   if (!(lead.email && lead.firstName && lead.lastName)) {
     console.warn(
-      'Insufficient data for Orion Connect provider - first name, last name and company website are required'
+      'Insufficient data for Orion Connect provider - first name, last name and email are required'
     )
     return null
   }
@@ -28,6 +28,11 @@ export async function findPhoneByNameAndCompanyWebsite(lead: LeadFindPhoneReqBod
       companyWebsite: lead.email.split('@')[1],
     }),
   })
+
+  if (!response.ok) {
+    console.warn(`Orion Connect provider returned ${response.status}: ${response.statusText}`)
+    return null
+  }
 
   return response.json()
 }
@@ -46,6 +51,11 @@ export async function findPhoneByEmail(lead: LeadFindPhoneReqBody) {
     }),
   })
 
+  if (!response.ok) {
+    console.warn(`Astra Dialer provider returned ${response.status}: ${response.statusText}`)
+    return null
+  }
+
   return response.json()
 }
 
@@ -63,6 +73,11 @@ export async function findPhoneByEmailAndJobTitle(lead: LeadFindPhoneReqBody) {
       jobTitle: lead.jobTitle,
     }),
   })
+
+  if (!response.ok) {
+    console.warn(`Numbus Lookup provider returned ${response.status}: ${response.statusText}`)
+    return null
+  }
 
   return response.json()
 }

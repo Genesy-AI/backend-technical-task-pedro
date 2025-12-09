@@ -4,7 +4,7 @@ import { LeadFindPhoneReqBody } from 'src/types/Leads'
 
 const { findPhoneByNameAndCompanyWebsite, findPhoneByEmail, findPhoneByEmailAndJobTitle, verifyEmail } =
   proxyActivities<typeof activities>({
-    startToCloseTimeout: '5 second',
+    startToCloseTimeout: '10 second',
   })
 
 export async function verifyEmailWorkflow(email: string): Promise<boolean> {
