@@ -9,6 +9,7 @@ export type LeadsGetManyOutput = {
   email: string | null
   jobTitle: string | null
   countryCode: string | null
+  phoneNumber: string | null
   companyName: string | null
   message: string | null
   emailVerified: boolean | null

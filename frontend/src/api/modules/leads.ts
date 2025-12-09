@@ -20,6 +20,7 @@ export const leadsApi = {
     'post',
     '/leads/generate-messages'
   ),
+  findPhoneNumbers: endpoint<any, { query: string }>('post', '/leads/find-phones'),
   bulkImport: endpoint<LeadsBulkImportOutput, LeadsBulkImportInput>('post', '/leads/bulk'),
   verifyEmails: endpoint<LeadsVerifyEmailsOutput, LeadsVerifyEmailsInput>('post', '/leads/verify-emails'),
 } as const satisfies ApiModule
