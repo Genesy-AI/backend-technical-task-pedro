@@ -13,7 +13,7 @@ export async function verifyEmail(email: string): Promise<boolean> {
 }
 
 export async function findPhoneByNameAndCompanyWebsite(lead: LeadFindPhoneReqBody) {
-  if (!(lead.email && lead.firstName && lead.lastName)) {
+  if (!(lead.firstName && lead.lastName && lead.email)) {
     console.warn(
       'Insufficient data for Orion Connect provider - first name, last name and email are required'
     )
