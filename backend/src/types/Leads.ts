@@ -1,13 +1,13 @@
 export type LeadFindPhoneReqBody = {
-  id?: string
-  createdAt?: string
-  updatedAt?: string
+  id?: number
+  createdAt?: Date
+  updatedAt?: Date
   firstName?: string
   lastName?: string
   email?: string
-  jobTitle?: string
-  countryCode?: string
-  companyName?: string
-  message?: string
-  emailVerified?: boolean
+  jobTitle: string | null
+  countryCode: string | null
+  companyName: string | null
+  message: string | null
+  emailVerified: boolean | null
 }
