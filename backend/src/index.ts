@@ -354,6 +354,10 @@ app.post(
         args: [lead],
         taskQueue: 'myQueue',
         workflowId: `genesy-lead-${lead.id}-${Date.now()}`,
+        retry: {
+          maximumAttempts: 3,
+          maximumInterval: '30 seconds',
+        },
       })
     }
 

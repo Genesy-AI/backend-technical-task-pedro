@@ -12,7 +12,7 @@ export async function verifyEmail(email: string): Promise<boolean> {
   return true
 }
 
-export async function findPhoneActivity(lead: LeadFindPhoneReqBody) {
+export async function findPhoneByNameAndCompanyWebsite(lead: LeadFindPhoneReqBody) {
   if (!lead.email) {
     throw new Error('Lead email is required')
   }
@@ -33,7 +33,7 @@ export async function findPhoneActivity(lead: LeadFindPhoneReqBody) {
   return response ? res : null
 }
 
-export async function findPhone(lead: LeadFindPhoneReqBody) {
+export async function findPhoneByEmail(lead: LeadFindPhoneReqBody) {
   if (!lead.email) {
     throw new Error('Lead email is required')
   }
@@ -53,7 +53,7 @@ export async function findPhone(lead: LeadFindPhoneReqBody) {
   return response ? res : null
 }
 
-export async function findPhone2(lead: LeadFindPhoneReqBody) {
+export async function findPhoneByEmailAndJobTitle(lead: LeadFindPhoneReqBody) {
   if (!(lead.email && lead.jobTitle)) {
     throw new Error('Lead email is required')
   }
