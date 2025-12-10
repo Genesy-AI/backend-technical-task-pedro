@@ -4,8 +4,8 @@ export type LeadsFindPhoneNumbersInput = {
 
 export type LeadsFindPhoneNumbersOutput = {
   success: boolean
-  phonesFoundCount: number
-  phoneNotFoundCount: number
+  successfulPhoneSearchCount: number
+  unsuccessfulPhoneSearchCount: number
   errors: Array<{
     lead: number
     error: string
