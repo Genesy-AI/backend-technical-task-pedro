@@ -367,36 +367,53 @@ app.post(
       connection = await Connection.connect({ address: 'localhost:7233' })
       const client = new Client({ connection, namespace: 'default' })
 
-      let phonesFoundCount = 0
       const errors: Array<{ lead: number; error: string }> = []
 
-      for (const leadData of leads) {
-        try {
-          const leadWithPhoneProcessed = await client.workflow.execute(findPhoneWorkflow, {
-            args: [leadData],
-            taskQueue: 'myQueue',
-            workflowId: `find-phone-number-${leadData.id}-${Date.now()}`,
-            retry: {
-              maximumAttempts: 3,
-              maximumInterval: '30 seconds',
-            },
-          })
+      const workflowPromises = leads.map(async (leadData) => {
+        const leadWithPhoneProcessed = await client.workflow.execute(findPhoneWorkflow, {
+          args: [leadData],
+          taskQueue: 'myQueue',
+          workflowId: `find-phone-number-${leadData.id}-${Date.now()}`,
+          retry: {
+            maximumAttempts: 3,
+            maximumInterval: '30 seconds',
+          },
+        })
 
-          if (leadWithPhoneProcessed?.phone) {
-            await prisma.lead.update({
-              where: { id: Number(leadData.id) },
-              data: { phoneNumber: leadWithPhoneProcessed?.phone || null },
+        return { leadData, phone: leadWithPhoneProcessed?.phone }
+      })
+
+      const results = await Promise.allSettled(workflowPromises)
+
+      let phonesFoundCount = 0
+
+      await Promise.all(
+        results.map(async (result, index) => {
+          const leadData = leads[index]
+
+          if (result.status === 'fulfilled' && result.value.phone) {
+            try {
+              await prisma.lead.update({
+                where: { id: Number(leadData.id) },
+                data: { phoneNumber: result.value.phone },
+              })
+              phonesFoundCount++
+            } catch (error) {
+              errors.push({
+                lead: leadData.id,
+                error: error instanceof Error ? error.message : 'Failed to update lead',
+              })
+            }
+
+            // If phone is null/undefined, workflow succeeded but no phone was found - this is not an error
+          } else if (result.status === 'rejected') {
+            errors.push({
+              lead: leadData.id,
+              error: result.reason instanceof Error ? result.reason.message : 'Unknown error',
             })
-
-            phonesFoundCount++
           }
-        } catch (error) {
-          errors.push({
-            lead: leadData.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          })
-        }
-      }
+        })
+      )
 
       await connection.close()
 
