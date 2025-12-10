@@ -51,6 +51,20 @@ export const LeadsList: FC = () => {
     },
   })
 
+  const findPhoneNumbersMutation = useMutation({
+    mutationFn: async (ids: number[]) => api.leads.findPhoneNumbers({ leadIds: ids }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['leads', 'getMany'] })
+      toast.success(`Found ${result.phonesFoundCount} phone numbers.`)
+
+      console.log('Phone numbers found:', result)
+      // queryClient.invalidateQueries({ queryKey: ['leads', 'getMany'] })
+    },
+    onError: () => {
+      toast.error('Failed to generate messages. Please try again.')
+    },
+  })
+
   const handleSelectAll = (checked: boolean) => {
     if (checked && leads.data) {
       setSelectedLeads(leads.data.map((lead) => lead.id))
@@ -187,6 +201,7 @@ export const LeadsList: FC = () => {
                     </button>
                     <button
                       onClick={() => {
+                        findPhoneNumbersMutation.mutate(selectedLeads)
                         setIsEnrichDropdownOpen(false)
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
