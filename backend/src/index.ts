@@ -6,6 +6,7 @@ import { generateMessageFromTemplate } from './utils/messageGenerator'
 import { runTemporalWorker } from './worker'
 import { validateCountryCode } from './utils/validateCountryCode'
 import { canUseAnyProvider } from './utils/validateProvidersEligibility'
+import { validateLeadIds } from './utils/requests/validateLeadIds'
 const prisma = new PrismaClient()
 const app = express()
 app.use(express.json())
@@ -327,28 +328,16 @@ app.post(
     >,
     res: Response
   ) => {
-    if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({ error: 'Request body is required and must be valid JSON' })
-    }
-
-    const { leadIds } = req.body
-
-    if (!Array.isArray(leadIds) || leadIds.length === 0) {
-      return res.status(400).json({ error: '"leadIds" must be a non-empty array' })
-    }
-
-    const numericIds = leadIds.map((id) => (typeof id === 'string' ? Number(id) : id))
-    const invalidIds = numericIds.filter((id) => !Number.isInteger(id) || id <= 0 || isNaN(id))
-
-    if (invalidIds.length > 0) {
-      return res.status(400).json({ error: 'All leadIds must be valid positive integers' })
+    const idsValidationResult = validateLeadIds(req)
+    if ('error' in idsValidationResult) {
+      return res.status(idsValidationResult.status).json({ error: idsValidationResult.error })
     }
 
     let connection: Connection | undefined
 
     try {
       const leads = await prisma.lead.findMany({
-        where: { id: { in: numericIds } },
+        where: { id: { in: idsValidationResult.leadIds } },
       })
 
       if (leads.length === 0) {
@@ -358,7 +347,7 @@ app.post(
       const eligibleLeads = leads.filter((lead) => canUseAnyProvider(lead))
 
       if (eligibleLeads.length === 0) {
-        return res.status(400).json({
+        return res.status(404).json({
           error:
             'No valid "leads" found. A combination of the following is required - ["email"], ["email" and "jobTitle"], ["email", "firstName" and "lastName" ]',
         })
@@ -369,7 +358,7 @@ app.post(
 
       const errors: Array<{ lead: number; error: string }> = []
 
-      const workflowPromises = leads.map(async (leadData) => {
+      const workflowPromises = eligibleLeads.map(async (leadData) => {
         const leadWithPhoneProcessed = await client.workflow.execute(findPhoneWorkflow, {
           args: [leadData],
           taskQueue: 'myQueue',
@@ -385,42 +374,41 @@ app.post(
 
       const results = await Promise.allSettled(workflowPromises)
 
-      let phonesFoundCount = 0
-
-      await Promise.all(
-        results.map(async (result, index) => {
-          const leadData = leads[index]
-
-          if (result.status === 'fulfilled' && result.value.phone) {
-            try {
-              await prisma.lead.update({
-                where: { id: Number(leadData.id) },
-                data: { phoneNumber: result.value.phone },
-              })
-              phonesFoundCount++
-            } catch (error) {
-              errors.push({
-                lead: leadData.id,
-                error: error instanceof Error ? error.message : 'Failed to update lead',
-              })
-            }
-
-            // If phone is null/undefined, workflow succeeded but no phone was found - this is not an error
-          } else if (result.status === 'rejected') {
-            errors.push({
-              lead: leadData.id,
-              error: result.reason instanceof Error ? result.reason.message : 'Unknown error',
+      const updatePromises = results.map(async (result, index) => {
+        if (result.status === 'fulfilled' && result.value.phone) {
+          try {
+            await prisma.lead.update({
+              where: { id: Number(result.value.leadData.id) },
+              data: { phoneNumber: result.value.phone },
             })
+            return { success: true, leadId: result.value.leadData.id }
+          } catch (error) {
+            errors.push({
+              lead: result.value.leadData.id,
+              error: error instanceof Error ? error.message : 'Failed to update lead',
+            })
+            return { success: false, leadId: result.value.leadData.id }
           }
-        })
-      )
+        } else if (result.status === 'rejected') {
+          errors.push({
+            lead: eligibleLeads[index].id,
+            error:
+              result.reason instanceof Error
+                ? result.reason.message
+                : 'There was an error finding this phone number',
+          })
+          return { success: false, leadId: eligibleLeads[index].id }
+        }
+        return { success: false, leadId: eligibleLeads[index].id }
+      })
 
-      await connection.close()
+      const updateResults = await Promise.all(updatePromises)
+      const successfulPhoneSearchCount = updateResults.filter((r) => r.success).length
 
       res.status(200).json({
         success: true,
-        phonesFoundCount,
-        phoneNotFoundCount: leadIds.length - phonesFoundCount,
+        successfulPhoneSearchCount,
+        unsuccessfulPhoneSearchCount: idsValidationResult.leadIds.length - successfulPhoneSearchCount,
         errors,
       })
     } catch (error) {
