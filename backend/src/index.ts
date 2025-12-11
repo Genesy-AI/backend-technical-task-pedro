@@ -363,57 +363,70 @@ app.post(
       const client = await getTemporalClient()
 
       const errors: Array<{ lead: number; error: string }> = []
+      const BATCH_SIZE = 10
+      const BATCH_DELAY_MS = 1000
+      const allUpdateResults: Array<{ success: boolean; leadId: number }> = []
 
-      const workflowPromises = eligibleLeads.map(async (leadData) => {
-        const leadWithPhoneProcessed = await client.workflow.execute(findPhoneWorkflow, {
-          args: [leadData],
-          taskQueue: 'myQueue',
-          workflowId: `find-phone-number-${leadData.id}-${Date.now()}`,
-          retry: {
-            maximumAttempts: 3,
-            maximumInterval: '30 seconds',
-          },
-        })
+      for (let i = 0; i < eligibleLeads.length; i += BATCH_SIZE) {
+        const batch = eligibleLeads.slice(i, i + BATCH_SIZE)
 
-        return { leadData, phone: leadWithPhoneProcessed?.phone }
-      })
-
-      const results = await Promise.allSettled(workflowPromises)
-
-      const updatePromises = results.map(async (result, index) => {
-        if (result.status === 'fulfilled' && result.value.phone) {
-          try {
-            await prisma.lead.update({
-              where: { id: Number(result.value.leadData.id) },
-              data: { phoneNumber: result.value.phone },
-            })
-            return { success: true, leadId: result.value.leadData.id }
-          } catch (error) {
-            errors.push({
-              lead: result.value.leadData.id,
-              error: error instanceof Error ? error.message : 'Failed to update lead',
-            })
-            return { success: false, leadId: result.value.leadData.id }
-          }
-        } else if (result.status === 'rejected') {
-          errors.push({
-            lead: eligibleLeads[index].id,
-            error:
-              result.reason instanceof Error
-                ? result.reason.message
-                : 'There was an error finding this phone number',
+        const workflowPromises = batch.map(async (leadData) => {
+          const leadWithPhoneProcessed = await client.workflow.execute(findPhoneWorkflow, {
+            args: [leadData],
+            taskQueue: 'myQueue',
+            workflowId: `find-phone-number-${leadData.id}-${Date.now()}`,
+            retry: {
+              maximumAttempts: 3,
+              maximumInterval: '30 seconds',
+            },
           })
-          return { success: false, leadId: eligibleLeads[index].id }
-        }
-        errors.push({
-          lead: eligibleLeads[index].id,
-          error: 'No phone number found',
-        })
-        return { success: false, leadId: eligibleLeads[index].id }
-      })
 
-      const updateResults = await Promise.all(updatePromises)
-      const successfulPhoneSearchCount = updateResults.filter((r) => r.success).length
+          return { leadData, phone: leadWithPhoneProcessed?.phone }
+        })
+
+        const results = await Promise.allSettled(workflowPromises)
+
+        const updatePromises = results.map(async (result, batchIndex) => {
+          if (result.status === 'fulfilled' && result.value.phone) {
+            try {
+              await prisma.lead.update({
+                where: { id: Number(result.value.leadData.id) },
+                data: { phoneNumber: result.value.phone },
+              })
+              return { success: true, leadId: result.value.leadData.id }
+            } catch (error) {
+              errors.push({
+                lead: result.value.leadData.id,
+                error: error instanceof Error ? error.message : 'Failed to update lead',
+              })
+              return { success: false, leadId: result.value.leadData.id }
+            }
+          } else if (result.status === 'rejected') {
+            errors.push({
+              lead: batch[batchIndex].id,
+              error:
+                result.reason instanceof Error
+                  ? result.reason.message
+                  : 'There was an error finding this phone number',
+            })
+            return { success: false, leadId: batch[batchIndex].id }
+          }
+          errors.push({
+            lead: batch[batchIndex].id,
+            error: 'No phone number found',
+          })
+          return { success: false, leadId: batch[batchIndex].id }
+        })
+
+        const batchUpdateResults = await Promise.all(updatePromises)
+        allUpdateResults.push(...batchUpdateResults)
+
+        if (i + BATCH_SIZE < eligibleLeads.length) {
+          await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS))
+        }
+      }
+
+      const successfulPhoneSearchCount = allUpdateResults.filter((r) => r.success).length
 
       res.status(200).json({
         success: true,

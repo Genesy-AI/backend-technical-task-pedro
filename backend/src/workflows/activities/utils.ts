@@ -54,7 +54,9 @@ export async function findPhoneByEmail(lead: LeadFindPhoneReqBody) {
   })
 
   if (!response.ok) {
-    console.warn(`Astra Dialer provider returned ${response.status}: ${response.statusText}`)
+    console.warn(
+      `Astra Dialer provider returned ${response.status}: ${response.statusText} - leadId ${lead.id}`
+    )
     return null
   }
 
@@ -77,7 +79,9 @@ export async function findPhoneByEmailAndJobTitle(lead: LeadFindPhoneReqBody) {
   })
 
   if (!response.ok) {
-    console.warn(`Numbus Lookup provider returned ${response.status}: ${response.statusText}`)
+    console.warn(
+      `Numbus Lookup provider returned ${response.status}: ${response.statusText} - leadId ${lead.id}`
+    )
     return null
   }
 
