@@ -8,6 +8,18 @@ import { validateCountryCode } from './utils/validateCountryCode'
 import { canUseAnyProvider } from './utils/validateProvidersEligibility'
 import { validateLeadIds } from './utils/requests/validateLeadIds'
 const prisma = new PrismaClient()
+
+let temporalClient: Client | null = null
+let temporalConnection: Connection | null = null
+
+async function getTemporalClient(): Promise<Client> {
+  if (!temporalClient || !temporalConnection) {
+    temporalConnection = await Connection.connect({ address: 'localhost:7233' })
+    temporalClient = new Client({ connection: temporalConnection, namespace: 'default' })
+  }
+  return temporalClient
+}
+
 const app = express()
 app.use(express.json())
 
@@ -276,8 +288,7 @@ app.post('/leads/verify-emails', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'No leads found with the provided IDs' })
     }
 
-    const connection = await Connection.connect({ address: 'localhost:7233' })
-    const client = new Client({ connection, namespace: 'default' })
+    const client = await getTemporalClient()
 
     let verifiedCount = 0
     const results: Array<{ leadId: number; emailVerified: boolean }> = []
@@ -307,8 +318,6 @@ app.post('/leads/verify-emails', async (req: Request, res: Response) => {
       }
     }
 
-    await connection.close()
-
     res.json({ success: true, verifiedCount, results, errors })
   } catch (error) {
     console.error('Error verifying emails:', error)
@@ -333,8 +342,6 @@ app.post(
       return res.status(idsValidationResult.status).json({ error: idsValidationResult.error })
     }
 
-    let connection: Connection | undefined
-
     try {
       const leads = await prisma.lead.findMany({
         where: { id: { in: idsValidationResult.leadIds } },
@@ -353,8 +360,7 @@ app.post(
         })
       }
 
-      connection = await Connection.connect({ address: 'localhost:7233' })
-      const client = new Client({ connection, namespace: 'default' })
+      const client = await getTemporalClient()
 
       const errors: Array<{ lead: number; error: string }> = []
 
@@ -399,6 +405,10 @@ app.post(
           })
           return { success: false, leadId: eligibleLeads[index].id }
         }
+        errors.push({
+          lead: eligibleLeads[index].id,
+          error: 'No phone number found',
+        })
         return { success: false, leadId: eligibleLeads[index].id }
       })
 
@@ -414,10 +424,6 @@ app.post(
     } catch (error) {
       console.error('Error finding phones for leads:', error)
       res.status(500).json({ error: 'Failed to find phones' })
-    } finally {
-      if (connection) {
-        await connection.close()
-      }
     }
   }
 )
@@ -429,4 +435,18 @@ app.listen(4000, () => {
 runTemporalWorker().catch((err) => {
   console.error(err)
   process.exit(1)
+})
+
+process.on('SIGTERM', async () => {
+  if (temporalConnection) {
+    await temporalConnection.close()
+  }
+  process.exit(0)
+})
+
+process.on('SIGINT', async () => {
+  if (temporalConnection) {
+    await temporalConnection.close()
+  }
+  process.exit(0)
 })

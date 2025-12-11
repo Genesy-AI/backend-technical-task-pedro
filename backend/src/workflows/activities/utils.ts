@@ -30,7 +30,9 @@ export async function findPhoneByNameAndCompanyWebsite(lead: LeadFindPhoneReqBod
   })
 
   if (!response.ok) {
-    console.warn(`Orion Connect provider returned ${response.status}: ${response.statusText}`)
+    console.warn(
+      `Orion Connect provider returned ${response.status}: ${response.statusText} - leadId ${lead.id}`
+    )
     return null
   }
 
