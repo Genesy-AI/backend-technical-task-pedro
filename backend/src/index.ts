@@ -364,7 +364,7 @@ app.post(
 
       const errors: Array<{ leadId: number; error: string }> = []
       const successfulPhones: Array<{ leadId: number; phoneNumber: string }> = []
-      const BATCH_SIZE = 1000
+      const BATCH_SIZE = 10
       const BATCH_DELAY_MS = 2000
       const allUpdateResults: Array<{ success: boolean; leadId: number }> = []
 

@@ -17,14 +17,5 @@ export const validateLeadIds = (req: Request): { status: number; error: string }
     }
   }
 
-  const numericIds = leadIds.map((id) => (typeof id === 'string' ? Number(id) : id))
-
-  if (numericIds.some((id) => !Number.isInteger(id) || id <= 0 || isNaN(id))) {
-    return {
-      status: 400,
-      error: 'All leadIds must be valid positive integers',
-    }
-  }
-
-  return { leadIds: numericIds }
+  return { leadIds: leadIds.map((id) => (typeof id === 'string' ? Number(id) : id)) }
 }
