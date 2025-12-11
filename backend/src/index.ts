@@ -362,9 +362,10 @@ app.post(
 
       const client = await getTemporalClient()
 
-      const errors: Array<{ lead: number; error: string }> = []
-      const BATCH_SIZE = 10
-      const BATCH_DELAY_MS = 1000
+      const errors: Array<{ leadId: number; error: string }> = []
+      const successfulPhones: Array<{ leadId: number; phoneNumber: string }> = []
+      const BATCH_SIZE = 1000
+      const BATCH_DELAY_MS = 2000
       const allUpdateResults: Array<{ success: boolean; leadId: number }> = []
 
       for (let i = 0; i < eligibleLeads.length; i += BATCH_SIZE) {
@@ -393,17 +394,21 @@ app.post(
                 where: { id: Number(result.value.leadData.id) },
                 data: { phoneNumber: result.value.phone },
               })
+              successfulPhones.push({
+                leadId: result.value.leadData.id,
+                phoneNumber: result.value.phone,
+              })
               return { success: true, leadId: result.value.leadData.id }
             } catch (error) {
               errors.push({
-                lead: result.value.leadData.id,
+                leadId: result.value.leadData.id,
                 error: error instanceof Error ? error.message : 'Failed to update lead',
               })
               return { success: false, leadId: result.value.leadData.id }
             }
           } else if (result.status === 'rejected') {
             errors.push({
-              lead: batch[batchIndex].id,
+              leadId: batch[batchIndex].id,
               error:
                 result.reason instanceof Error
                   ? result.reason.message
@@ -412,7 +417,7 @@ app.post(
             return { success: false, leadId: batch[batchIndex].id }
           }
           errors.push({
-            lead: batch[batchIndex].id,
+            leadId: batch[batchIndex].id,
             error: 'No phone number found',
           })
           return { success: false, leadId: batch[batchIndex].id }
@@ -432,6 +437,7 @@ app.post(
         success: true,
         successfulPhoneSearchCount,
         unsuccessfulPhoneSearchCount: idsValidationResult.leadIds.length - successfulPhoneSearchCount,
+        phones: successfulPhones,
         errors,
       })
     } catch (error) {

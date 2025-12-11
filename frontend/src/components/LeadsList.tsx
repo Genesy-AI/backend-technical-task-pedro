@@ -55,13 +55,10 @@ export const LeadsList: FC = () => {
     mutationFn: async (ids: number[]) => api.leads.findPhoneNumbers({ leadIds: ids }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['leads', 'getMany'] })
-      toast.success(`Found ${result.phonesFoundCount} phone numbers.`)
-
-      console.log('Phone numbers found:', result)
-      // queryClient.invalidateQueries({ queryKey: ['leads', 'getMany'] })
+      toast.success(`Found ${result.successfulPhoneSearchCount} phone numbers.`)
     },
     onError: () => {
-      toast.error('Failed to generate messages. Please try again.')
+      toast.error('Failed to find phone numbers. Please try again.')
     },
   })
 
